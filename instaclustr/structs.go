@@ -29,7 +29,7 @@ type BundleOptions struct {
 	UsePrivateBroadcastRpcAddress *bool  `json:"usePrivateBroadcastRPCAddress,omitempty" mapstructure:"use_private_broadcast_rpc_address,omitempty"`
 	LuceneEnabled                 *bool  `json:"luceneEnabled,omitempty" mapstructure:"lucene_enabled,omitempty"`
 	ContinuousBackupEnabled       *bool  `json:"continuousBackupEnabled,omitempty" mapstructure:"continuous_backup_enabled,omitempty"`
-	NumberPartitions              string `json:"numberPartitions,omitempty" mapstructure:"number_partitions,omitempty"`
+	NumberPartitions              int    `json:"numberPartitions,omitempty" mapstructure:"number_partitions,omitempty"`
 	AutoCreateTopics              *bool  `json:"autoCreateTopics,omitempty" mapstructure:"auto_create_topics,omitempty"`
 	DeleteTopics                  *bool  `json:"deleteTopics,omitempty" mapstructure:"delete_topics,omitempty"`
 	PasswordAuthentication        *bool  `json:"passwordAuthentication,omitempty" mapstructure:"password_authentication,omitempty"`
@@ -49,11 +49,11 @@ type BundleOptions struct {
 	SaslJaasConfig                string `json:"sasl.jaas.config,omitempty" mapstructure:"sasl_jaas_config,omitempty"`
 	BootstrapServers              string `json:"bootstrap.servers,omitempty" mapstructure:"bootstrap_servers,omitempty"`
 	Truststore                    string `json:"truststore,omitempty" mapstructure:"truststore,omitempty"`
-	RedisMasterNodes              string `json:"masterNodes,omitempty" mapstructure:"master_nodes,omitempty"`
-	RedisReplicaNodes             string `json:"replicaNodes,omitempty" mapstructure:"replica_nodes,omitempty"`
+	RedisMasterNodes              int    `json:"masterNodes,omitempty" mapstructure:"master_nodes,omitempty"`
+	RedisReplicaNodes             int    `json:"replicaNodes,omitempty" mapstructure:"replica_nodes,omitempty"`
 	DedicatedZookeeper            *bool  `json:"dedicatedZookeeper,omitempty" mapstructure:"dedicated_zookeeper,omitempty"`
 	ZookeeperNodeSize             string `json:"zookeeperNodeSize,omitempty" mapstructure:"zookeeper_node_size,omitempty"`
-	ZookeeperNodeCount            string `json:"zookeeperNodeCount,omitempty" mapstructure:"zookeeper_node_count,omitempty"`
+	ZookeeperNodeCount            int    `json:"zookeeperNodeCount,omitempty" mapstructure:"zookeeper_node_count,omitempty"`
 	KibanaVersion                 string `json:"kibanaVersion,omitempty" mapstructure:"kibana_version"`
 	KibanaNodeSize                string `json:"kibanaNodeSize,omitempty" mapstructure:"kibana_node_size"`
 	KibanaNodeCount               string `json:"kibanaNodeCount,omitempty" mapstructure:"kibana_node_count"`
@@ -92,19 +92,20 @@ type AddonBundles struct {
 }
 
 type Cluster struct {
-	ID                         string                 `json:"id"`
-	ClusterName                string                 `json:"clusterName"`
-	ClusterStatus              string                 `json:"clusterStatus"`
-	BundleType                 string                 `json:"bundleType"`
-	BundleVersion              string                 `json:"bundleVersion"`
-	AddonBundles               map[string]interface{} `json:"addonBundles"`
-	Username                   string                 `json:"username"`
-	InstaclustrUserPassword    string                 `json:"instaclustrUserPassword"`
-	SlaTier                    string                 `json:"slaTier"`
-	ClusterCertificateDownload string                 `json:"clusterCertificateDownload"`
-	PciCompliance              string                 `json:"pciCompliance"`
-	BundleOption               BundleOptions          `json:"bundleOptions"`
-	DataCentres                []DataCentre           `json:"dataCentres"`
+	ID                         string                   `json:"id"`
+	ClusterName                string                   `json:"clusterName"`
+	ClusterStatus              string                   `json:"clusterStatus"`
+	BundleType                 string                   `json:"bundleType"`
+	BundleVersion              string                   `json:"bundleVersion"`
+	AddonBundles               []map[string]interface{} `json:"addonBundles"`
+	Username                   string                   `json:"username"`
+	InstaclustrUserPassword    string                   `json:"instaclustrUserPassword"`
+	SlaTier                    string                   `json:"slaTier"`
+	ClusterCertificateDownload string                   `json:"clusterCertificateDownload"`
+	PciCompliance              string                   `json:"pciCompliance"`
+	BundleOption               *BundleOptions           `json:"bundleOptions"`
+	DataCentres                []DataCentre             `json:"dataCentres"`
+	Provider                   []ClusterProvider        `json:"clusterProvider"`
 }
 
 type DataCentre struct {

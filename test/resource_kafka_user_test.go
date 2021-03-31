@@ -2,15 +2,13 @@ package test
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"testing"
-	"time"
-	"strconv"
-
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
 	"github.com/instaclustr/terraform-provider-instaclustr/instaclustr"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"testing"
 )
 
 func TestKafkaUserResource(t *testing.T) {
@@ -24,7 +22,7 @@ func TestKafkaUserResource(t *testing.T) {
 	username := os.Getenv("IC_USERNAME")
 	apiKey := os.Getenv("IC_API_KEY")
 	hostname := getOptionalEnv("IC_API_URL", instaclustr.DefaultApiHostname)
-	
+
 	kafkaUsername := "charlie"
 	oldPassword := "charlie123!"
 	newPassword := "charlie123standard!"
@@ -36,16 +34,16 @@ func TestKafkaUserResource(t *testing.T) {
 	updateKafkaUserConfig := fmt.Sprintf(string(configBytes3), username, apiKey, hostname, zookeeperNodeSize, kafkaUsername, newPassword)
 
 	resource.Test(t, resource.TestCase{
-		Providers:    testProviders,
+		Providers: testProviders,
 		Steps: []resource.TestStep{
 			{
 				Config: createClusterConfig,
 				Check: resource.ComposeTestCheckFunc(
 					testCheckResourceValidKafka("instaclustr_cluster.kafka_cluster"),
-					checkKafkaClusterRunning(hostname, username, apiKey),
+					checkClusterRunning("kafka_cluster", hostname, username, apiKey),
 				),
 			},
- 			{
+			{
 				Config: createKafkaUserConfig,
 				Check: resource.ComposeTestCheckFunc(
 					testCheckResourceValidKafka("instaclustr_kafka_user.kafka_user_charlie"),
@@ -63,17 +61,16 @@ func TestKafkaUserResource(t *testing.T) {
 			// So, we just have to trust that successful API query changed the kafka user password.
 			{
 				Config: updateKafkaUserConfig,
-				Check: checkKafkaUserUpdated(newPassword),
+				Check:  checkKafkaUserUpdated(newPassword),
 			},
 			// Can't rely on the resource destruction because we need the destruction to happen in order and checked,
 			// i.e., we need to destroy the kafka user resources first.
 			{
 				Config: createClusterConfig,
-				Check: checkKafkaUserDeleted(kafkaUsername, hostname, username, apiKey),
+				Check:  checkKafkaUserDeleted(kafkaUsername, hostname, username, apiKey),
 			},
 		},
 	})
-	
 }
 
 func testCheckResourceValidKafka(resourceName string) resource.TestCheckFunc {
@@ -91,41 +88,6 @@ func testCheckResourceValidKafka(resourceName string) resource.TestCheckFunc {
 	}
 }
 
-func checkKafkaClusterRunning(hostname, username, apiKey string) resource.TestCheckFunc {
-	return func(s *terraform.State) error {
-		resourceState := s.Modules[0].Resources["instaclustr_cluster.kafka_cluster"]
-		id := resourceState.Primary.Attributes["cluster_id"]
-		client := new(instaclustr.APIClient)
-		client.InitClient(hostname, username, apiKey)
-
-		const ClusterReadInterval = 5
-		const WaitForClusterTimeout = 30 * 60
-		var latestStatus string
-		timePassed := 0
-		fmt.Print("\033[s")
-		for {
-			cluster, err := client.ReadCluster(id)
-			if err != nil {
-				fmt.Printf("\n")
-				return fmt.Errorf("[Error] Error retrieving cluster info: %s", err)
-			}
-			latestStatus = cluster.ClusterStatus
-			if cluster.ClusterStatus == "RUNNING" {
-				break
-			}
-			if timePassed > WaitForClusterTimeout {
-				fmt.Printf("\n")
-				return fmt.Errorf("[Error] Timed out waiting for cluster to have the status 'RUNNING'. Current cluster status is '%s'", latestStatus)
-			}
-			timePassed += ClusterReadInterval
-			fmt.Printf("\033[u\033[K%ds has elapsed while waiting for the cluster to reach RUNNING.\n", timePassed)
-			time.Sleep(ClusterReadInterval * time.Second)
-		}
-		fmt.Printf("\n")
-		return nil
-	}
-}
-
 func checkKafkaUserCreated(hostname, username, apiKey string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		resourceState := s.Modules[0].Resources["instaclustr_kafka_user.kafka_user_charlie"]
@@ -139,7 +101,7 @@ func checkKafkaUserCreated(hostname, username, apiKey string) resource.TestCheck
 		if err != nil {
 			return fmt.Errorf("Failed to read Kafka user list from %s: %s", clusterId, err)
 		}
-		for _,str := range usernameList {
+		for _, str := range usernameList {
 			if kafka_username == str {
 				return nil
 			}
@@ -159,7 +121,7 @@ func checkKafkaUserUpdated(newPassword string) resource.TestCheckFunc {
 		if instanceState == nil {
 			return fmt.Errorf("resource has no primary instance")
 		}
-		
+
 		if instanceState.Attributes["password"] != newPassword {
 			return fmt.Errorf("The new password in the terraform state is not as expected after update: %s != %s", instanceState.Attributes["password"], newPassword)
 		}
@@ -175,12 +137,12 @@ func checkKafkaUserDeleted(kafka_username, hostname, username, apiKey string) re
 
 		client := new(instaclustr.APIClient)
 		client.InitClient(hostname, username, apiKey)
-		
+
 		usernameList, err := client.ReadKafkaUserList(clusterId)
 		if err != nil {
 			return fmt.Errorf("Failed to read Kafka user list from %s: %s", clusterId, err)
 		}
-		for _,str := range usernameList {
+		for _, str := range usernameList {
 			if kafka_username == str {
 				return fmt.Errorf("Kafka user %s still exists in %s", kafka_username, clusterId)
 			}
@@ -204,13 +166,13 @@ func checkKafkaUserListCreated(hostname, username, apiKey string) resource.TestC
 
 		resourceListLen, _ := strconv.Atoi(resourceState.Primary.Attributes["username_list.#"])
 		if resourceListLen != len(usernameList) {
-			return fmt.Errorf("List of Kafka users of the Kafka cluster and resource are different (Length %d != %d). ", resourceListLen, len(usernameList) )
+			return fmt.Errorf("List of Kafka users of the Kafka cluster and resource are different (Length %d != %d). ", resourceListLen, len(usernameList))
 		}
 
 		for index, kafka_username := range usernameList {
 			resourceUser := resourceState.Primary.Attributes[fmt.Sprintf("username_list.%d", index)]
 			if resourceUser != kafka_username {
-			return fmt.Errorf("List of Kafka users of the Kafka cluster and resource are different (Index %d: %s != %s). ", index, resourceUser, kafka_username )
+				return fmt.Errorf("List of Kafka users of the Kafka cluster and resource are different (Index %d: %s != %s). ", index, resourceUser, kafka_username)
 			}
 		}
 
