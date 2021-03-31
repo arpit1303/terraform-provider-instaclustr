@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -341,6 +340,21 @@ func resourceCluster() *schema.Resource {
 										Optional: true,
 										ForceNew: true,
 									},
+									"kibana_version": {
+										Type:     schema.TypeString,
+										Optional: true,
+										ForceNew: true,
+									},
+									"kibana_node_size": {
+										Type:     schema.TypeString,
+										Optional: true,
+										ForceNew: true,
+									},
+									"kibana_node_count": {
+										Type:     schema.TypeInt,
+										Optional: true,
+										ForceNew: true,
+									},
 								},
 							},
 						},
@@ -563,9 +577,12 @@ func createBundleUserUpdateRequest(bundleUsername string, bundleUserPassword str
 
 func getBundleConfig(bundles []Bundle) BundleConfig {
 	configs := BundleConfig{
-		IsKafkaCluster:    false,
-		HasRestProxy:      false,
-		HasSchemaRegistry: false,
+		IsKafkaCluster:         false,
+		HasRestProxy:           false,
+		HasSchemaRegistry:      false,
+		IsElasticsearchCluster: false,
+		HasDedicatedMaster:     false,
+		HasKibana:              false,
 	}
 
 	for i := 0; i < len(bundles); i++ {
@@ -579,8 +596,46 @@ func getBundleConfig(bundles []Bundle) BundleConfig {
 		if bundles[i].Bundle == "KAFKA_SCHEMA_REGISTRY" {
 			configs.HasSchemaRegistry = true
 		}
+		if bundles[i].Bundle == "ELASTICSEARCH" {
+			configs.IsElasticsearchCluster = true
+		}
+		if *bundles[i].Options.DedicatedMasterNodes == true {
+			configs.HasDedicatedMaster = true
+		}
+		if bundles[i].Options.KibanaNodeSize != "" {
+			configs.HasKibana = true
+		}
 	}
 	return configs
+}
+
+func getBundleOptionsChanges(d *schema.ResourceData) ([]BundleOptions, []BundleOptions, error) {
+	bundleOptionsBefore := make([]BundleOptions, 0)
+	bundleOptionsAfter := make([]BundleOptions, 0)
+
+	bundleBefore, bundleAfter := d.GetChange("bundle")
+	bundleBeforeSlice := bundleBefore.([]interface{})
+	bundleAfterSlice := bundleAfter.([]interface{})
+
+	for i := 0; i < len(bundleBeforeSlice); i++ {
+		bundleChangesBefore := bundleBeforeSlice[i].(map[string]interface{})
+		bundleChangesAfter := bundleAfterSlice[i].(map[string]interface{})
+
+		var newBeforeOptions BundleOptions
+		err := mapstructure.WeakDecode(bundleChangesBefore["options"].(map[string]interface{}), &newBeforeOptions)
+		if err != nil {
+			return nil, nil, err
+		}
+		bundleOptionsBefore = append(bundleOptionsBefore, newBeforeOptions)
+
+		var newAfterOptions BundleOptions
+		err = mapstructure.WeakDecode(bundleChangesAfter["options"].(map[string]interface{}), &newAfterOptions)
+		if err != nil {
+			return nil, nil, err
+		}
+		bundleOptionsAfter = append(bundleOptionsAfter, newAfterOptions)
+	}
+	return bundleOptionsBefore, bundleOptionsAfter, nil
 }
 
 func appendIfMissing(slice []string, toAppend string) []string {
@@ -592,13 +647,12 @@ func appendIfMissing(slice []string, toAppend string) []string {
 	return append(slice, toAppend)
 }
 
-
 func doClusterResize(client *APIClient, clusterID string, d *schema.ResourceData) error {
 
 	before, after := d.GetChange("node_size")
-	regex := regexp.MustCompile(`resizeable-(small|large)`)
-	oldNodeClass := regex.FindString(before.(string))
-	newNodeClass := regex.FindString(after.(string))
+	//regex := regexp.MustCompile(`resizeable-(small|large)`)
+	oldNodeClass := before.(string)
+	newNodeClass := after.(string)
 
 	isNotResizable := (oldNodeClass == "")
 	isNotSameSizeClass := (newNodeClass != oldNodeClass)
@@ -610,14 +664,73 @@ func doClusterResize(client *APIClient, clusterID string, d *schema.ResourceData
 	if err != nil {
 		return fmt.Errorf("[Error] Error reading cluster: %s", err)
 	}
-	err = client.ResizeCluster(clusterID, cluster.DataCentres[0].ID, after.(string))
+	nodePurpose := determineNodePurpose(d)
+	if nodePurpose == "Error" {
+		return fmt.Errorf("[Error] Error resizing cluster %s with error", clusterID)
+	}
+	if nodePurpose == "" {
+		err = client.ResizeWithoutNodePurpose(clusterID, cluster.DataCentres[0].ID, after.(string))
+		if err != nil {
+			return fmt.Errorf("[Error] Error resizing cluster %s with error %s", clusterID, err)
+		}
+	}
+	err = client.ResizeCluster(clusterID, cluster.DataCentres[0].ID, after.(string), nodePurpose)
 	if err != nil {
 		return fmt.Errorf("[Error] Error resizing cluster %s with error %s", clusterID, err)
 	}
 	return nil
 }
 
-func resourceClusterRead(d *schema.ResourceData, meta interface{}) error{
+func determineNodePurpose(d *schema.ResourceData) string {
+
+	beforeNodeSize, afterNodeSize := d.GetChange("node_size")
+	beforeBundleOptions, afterBundleOptions, err := getBundleOptionsChanges(d)
+	if err != nil {
+		return "Error"
+	}
+	bundles, err := getBundles(d)
+	if err != nil {
+		return "Error"
+	}
+	bundleConfig := getBundleConfig(bundles)
+
+	beforeKibanaNodeSize := beforeBundleOptions[0].KibanaNodeSize
+	afterKibanaNodeSize := afterBundleOptions[0].KibanaNodeSize
+
+	beforeMasterNodeSize := beforeBundleOptions[0].MasterNodeSize
+	afterMasterNodeSize := afterBundleOptions[0].MasterNodeSize
+
+	if bundleConfig.IsElasticsearchCluster {
+		if beforeNodeSize != afterNodeSize {
+			if !bundleConfig.HasKibana && !bundleConfig.HasDedicatedMaster {
+				return "ELASTICSEARCH_MASTER"
+			}
+			if bundleConfig.HasKibana && bundleConfig.HasDedicatedMaster {
+				if afterNodeSize == afterMasterNodeSize && afterNodeSize == afterKibanaNodeSize {
+					if beforeKibanaNodeSize != afterKibanaNodeSize && beforeMasterNodeSize != afterMasterNodeSize {
+						return ""
+					}
+					if beforeMasterNodeSize == afterMasterNodeSize {
+						return "ELASTICSEARCH_DATA_AND_INGEST"
+					}
+				}
+			}
+		} else if bundleConfig.HasKibana && !bundleConfig.HasDedicatedMaster {
+			if beforeKibanaNodeSize != afterKibanaNodeSize {
+				return "ELASTICSEARCH_KIBANA"
+			}
+		} else if bundleConfig.HasDedicatedMaster && !bundleConfig.HasKibana {
+			if beforeMasterNodeSize != afterMasterNodeSize {
+				return "ELASTICSEARCH_MASTER"
+			}
+		} else {
+			return "Error"
+		}
+	}
+	return "Error"
+}
+
+func resourceClusterRead(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*Config).Client
 	id := d.Get("cluster_id").(string)
 	log.Printf("[INFO] Reading status of cluster %s.", id)
@@ -644,7 +757,7 @@ func resourceClusterRead(d *schema.ResourceData, meta interface{}) error{
 	for k, v := range baseBundleOptions {
 		//terraform expects strings for everything
 		//This line changes interface{*bool} -> *bool -> bool -> interface{bool} -> String
-		baseBundleOptions[k] = fmt.Sprintf("%v",reflect.Indirect(reflect.ValueOf(v).Elem()).Interface())
+		baseBundleOptions[k] = fmt.Sprintf("%v", reflect.Indirect(reflect.ValueOf(v).Elem()).Interface())
 	}
 
 	baseBundle["options"] = baseBundleOptions
@@ -656,8 +769,7 @@ func resourceClusterRead(d *schema.ResourceData, meta interface{}) error{
 		bundles = append(bundles, cluster.AddonBundles)
 	}
 
-
-	if err:= d.Set("bundle", bundles); err != nil {
+	if err := d.Set("bundle", bundles); err != nil {
 		return fmt.Errorf("[Error] Error reading cluster: %s", err)
 	}
 
@@ -683,14 +795,13 @@ func resourceClusterRead(d *schema.ResourceData, meta interface{}) error{
 		}
 	}
 	rackCount := len(rackList)
-	nodesPerRack := nodeCount/rackCount
+	nodesPerRack := nodeCount / rackCount
 
 	rackAllocation := make(map[string]interface{}, 0)
 	rackAllocation["number_of_racks"] = strconv.Itoa(rackCount)
 	rackAllocation["nodes_per_rack"] = strconv.Itoa(nodesPerRack)
 
-
-	if err:= d.Set("rack_allocation", rackAllocation); err != nil {
+	if err := d.Set("rack_allocation", rackAllocation); err != nil {
 		return fmt.Errorf("[Error] Error reading cluster, rack allocation could not be derived: %s", err)
 	}
 	if len(cluster.DataCentres[0].ResizeTargetNodeSize) > 0 {

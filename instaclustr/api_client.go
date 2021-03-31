@@ -96,19 +96,101 @@ func (c *APIClient) DeleteCluster(clusterID string) error {
 	return nil
 }
 
-func (c *APIClient) ResizeCluster(clusterID string, cdcID string, newNodeSize string) error {
+func (c *APIClient) ResizeCluster(clusterID string, cdcID string, newNodeSize string, nodePurpose string) error {
+
 	request := ResizeClusterRequest{
 		NewNodeSize:           newNodeSize,
 		ConcurrentResizes:     1,
 		NotifySupportContacts: "false",
+		NodePurpose:           nodePurpose,
 	}
+
 	data, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("[Error] Error creating resize cluster request: %s", err)
+	}
+	url := fmt.Sprintf("%s/provisioning/v1/%s/%s/resize", c.apiServerHostname, clusterID, cdcID)
+	resp, err := c.MakeRequest(url, "POST", data)
+	if err != nil {
+		return err
+	}
+	bodyText, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 202 {
+		return errors.New(fmt.Sprintf("Status code: %d, message: %s", resp.StatusCode, bodyText))
+	}
+	return nil
+}
+
+func (c *APIClient) ResizeWithoutNodePurpose(clusterID string, cdcID string, newNodeSize string) error {
+
+	requestLegacy := ResizeClusterRequest{
+		NewNodeSize:           newNodeSize,
+		ConcurrentResizes:     1,
+		NotifySupportContacts: "false",
+	}
+	data, err := json.Marshal(requestLegacy)
 	if err != nil {
 		return fmt.Errorf("[Error] Error creating resize cluster request: %s", err)
 	}
 
 	url := fmt.Sprintf("%s/provisioning/v1/%s/%s/resize", c.apiServerHostname, clusterID, cdcID)
 	resp, err := c.MakeRequest(url, "POST", data)
+	if err != nil {
+		return err
+	}
+	bodyText, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 202 {
+		return errors.New(fmt.Sprintf("Status code: %d, message: %s", resp.StatusCode, bodyText))
+	}
+	return nil
+}
+
+// Function Usage : Call to get information about a specific resize operation, by providing the resizeOpId in the request.
+func (c *APIClient) ResizeGetOp(clusterID string, cdcID string, resizeOpId string) error {
+	url := fmt.Sprintf("%s/provisioning/v1/%s/%s/resize/%s", c.apiServerHostname, clusterID, cdcID, resizeOpId)
+	resp, err := c.MakeRequest(url, "GET", nil)
+	if err != nil {
+		return err
+	}
+	bodyText, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 202 {
+		return errors.New(fmt.Sprintf("Status code: %d, message: %s", resp.StatusCode, bodyText))
+	}
+	return nil
+}
+
+// Function Usage : List all the resize operations associated with a CDC.
+func (c *APIClient) ResizeGetAllOps(clusterID string, cdcID string) error {
+	url := fmt.Sprintf("%s/provisioning/v1/%s/%s/resize", c.apiServerHostname, clusterID, cdcID)
+	resp, err := c.MakeRequest(url, "GET", nil)
+	if err != nil {
+		return err
+	}
+	bodyText, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 202 {
+		return errors.New(fmt.Sprintf("Status code: %d, message: %s", resp.StatusCode, bodyText))
+	}
+	return nil
+}
+
+// Function Usage : Retrieves a list of node sizes that can be used to resize the current nodes.
+func (c *APIClient) ResizeGetAllResizableNodeSizes(clusterID string, cdcID string, nodeSize string) error {
+	url := fmt.Sprintf("%s/provisioning/v1/%s/%s/resize/%s", c.apiServerHostname, clusterID, cdcID, nodeSize)
+	resp, err := c.MakeRequest(url, "GET", nil)
+	if err != nil {
+		return err
+	}
+	bodyText, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 202 {
+		return errors.New(fmt.Sprintf("Status code: %d, message: %s", resp.StatusCode, bodyText))
+	}
+	return nil
+}
+
+// Function Usage : Cancel an ongoing resize operation.
+func (c *APIClient) ResizeCancel(clusterID string, cdcID string, resizeOpId string) error {
+	url := fmt.Sprintf("%s/provisioning/v1/%s/%s/resize/%s", c.apiServerHostname, clusterID, cdcID, resizeOpId)
+	resp, err := c.MakeRequest(url, "DELETE", nil)
 	if err != nil {
 		return err
 	}

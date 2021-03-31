@@ -20,20 +20,19 @@ type OmitEmptyBool struct {
 	value bool
 }
 
-
 type BundleOptions struct {
-	AuthnAuthz                    *bool   `json:"authnAuthz,omitempty" mapstructure:"auth_n_authz,omitempty"`
-	ClientEncryption              *bool   `json:"clientEncryption,omitempty" mapstructure:"client_encryption,omitempty"`
-	DedicatedMasterNodes          *bool   `json:"dedicatedMasterNodes,omitempty" mapstructure:"dedicated_master_nodes,omitempty"`
+	AuthnAuthz                    *bool  `json:"authnAuthz,omitempty" mapstructure:"auth_n_authz,omitempty"`
+	ClientEncryption              *bool  `json:"clientEncryption,omitempty" mapstructure:"client_encryption,omitempty"`
+	DedicatedMasterNodes          *bool  `json:"dedicatedMasterNodes,omitempty" mapstructure:"dedicated_master_nodes,omitempty"`
 	MasterNodeSize                string `json:"masterNodeSize,omitempty" mapstructure:"master_node_size,omitempty"`
-	SecurityPlugin                *bool   `json:"securityPlugin,omitempty" mapstructure:"security_plugin,omitempty"`
-	UsePrivateBroadcastRpcAddress *bool   `json:"usePrivateBroadcastRPCAddress,omitempty" mapstructure:"use_private_broadcast_rpc_address,omitempty"`
-	LuceneEnabled                 *bool   `json:"luceneEnabled,omitempty" mapstructure:"lucene_enabled,omitempty"`
-	ContinuousBackupEnabled       *bool   `json:"continuousBackupEnabled,omitempty" mapstructure:"continuous_backup_enabled,omitempty"`
+	SecurityPlugin                *bool  `json:"securityPlugin,omitempty" mapstructure:"security_plugin,omitempty"`
+	UsePrivateBroadcastRpcAddress *bool  `json:"usePrivateBroadcastRPCAddress,omitempty" mapstructure:"use_private_broadcast_rpc_address,omitempty"`
+	LuceneEnabled                 *bool  `json:"luceneEnabled,omitempty" mapstructure:"lucene_enabled,omitempty"`
+	ContinuousBackupEnabled       *bool  `json:"continuousBackupEnabled,omitempty" mapstructure:"continuous_backup_enabled,omitempty"`
 	NumberPartitions              string `json:"numberPartitions,omitempty" mapstructure:"number_partitions,omitempty"`
-	AutoCreateTopics              *bool   `json:"autoCreateTopics,omitempty" mapstructure:"auto_create_topics,omitempty"`
-	DeleteTopics                  *bool   `json:"deleteTopics,omitempty" mapstructure:"delete_topics,omitempty"`
-	PasswordAuthentication        *bool   `json:"passwordAuthentication,omitempty" mapstructure:"password_authentication,omitempty"`
+	AutoCreateTopics              *bool  `json:"autoCreateTopics,omitempty" mapstructure:"auto_create_topics,omitempty"`
+	DeleteTopics                  *bool  `json:"deleteTopics,omitempty" mapstructure:"delete_topics,omitempty"`
+	PasswordAuthentication        *bool  `json:"passwordAuthentication,omitempty" mapstructure:"password_authentication,omitempty"`
 	TargetKafkaClusterId          string `json:"targetKafkaClusterId,omitempty" mapstructure:"target_kafka_cluster_id,omitempty"`
 	VPCType                       string `json:"vpcType,omitempty" mapstructure:"vpc_type,omitempty"`
 	AWSAccessKeyId                string `json:"aws.access.key.id,omitempty" mapstructure:"aws_access_key,omitempty"`
@@ -52,9 +51,12 @@ type BundleOptions struct {
 	Truststore                    string `json:"truststore,omitempty" mapstructure:"truststore,omitempty"`
 	RedisMasterNodes              string `json:"masterNodes,omitempty" mapstructure:"master_nodes,omitempty"`
 	RedisReplicaNodes             string `json:"replicaNodes,omitempty" mapstructure:"replica_nodes,omitempty"`
-	DedicatedZookeeper            *bool   `json:"dedicatedZookeeper,omitempty" mapstructure:"dedicated_zookeeper,omitempty"`
+	DedicatedZookeeper            *bool  `json:"dedicatedZookeeper,omitempty" mapstructure:"dedicated_zookeeper,omitempty"`
 	ZookeeperNodeSize             string `json:"zookeeperNodeSize,omitempty" mapstructure:"zookeeper_node_size,omitempty"`
 	ZookeeperNodeCount            string `json:"zookeeperNodeCount,omitempty" mapstructure:"zookeeper_node_count,omitempty"`
+	KibanaVersion                 string `json:"kibanaVersion,omitempty" mapstructure:"kibana_version"`
+	KibanaNodeSize                string `json:"kibanaNodeSize,omitempty" mapstructure:"kibana_node_size"`
+	KibanaNodeCount               string `json:"kibanaNodeCount,omitempty" mapstructure:"kibana_node_count"`
 }
 
 type ClusterProvider struct {
@@ -85,24 +87,24 @@ type CreateRequest struct {
 }
 
 type AddonBundles struct {
-	Bundle						string		`json:"bundle"`
-	Version 					string		`json:"version"`
+	Bundle  string `json:"bundle"`
+	Version string `json:"version"`
 }
 
 type Cluster struct {
-	ID                         string        `json:"id"`
-	ClusterName                string        `json:"clusterName"`
-	ClusterStatus              string        `json:"clusterStatus"`
-	BundleType                 string        `json:"bundleType"`
-	BundleVersion              string        `json:"bundleVersion"`
-	AddonBundles			   map[string]interface{}	 `json:"addonBundles"`
-	Username                   string        `json:"username"`
-	InstaclustrUserPassword    string        `json:"instaclustrUserPassword"`
-	SlaTier                    string        `json:"slaTier"`
-	ClusterCertificateDownload string        `json:"clusterCertificateDownload"`
-	PciCompliance              string        `json:"pciCompliance"`
-	BundleOption               BundleOptions `json:"bundleOptions"`
-	DataCentres                []DataCentre  `json:"dataCentres"`
+	ID                         string                 `json:"id"`
+	ClusterName                string                 `json:"clusterName"`
+	ClusterStatus              string                 `json:"clusterStatus"`
+	BundleType                 string                 `json:"bundleType"`
+	BundleVersion              string                 `json:"bundleVersion"`
+	AddonBundles               map[string]interface{} `json:"addonBundles"`
+	Username                   string                 `json:"username"`
+	InstaclustrUserPassword    string                 `json:"instaclustrUserPassword"`
+	SlaTier                    string                 `json:"slaTier"`
+	ClusterCertificateDownload string                 `json:"clusterCertificateDownload"`
+	PciCompliance              string                 `json:"pciCompliance"`
+	BundleOption               BundleOptions          `json:"bundleOptions"`
+	DataCentres                []DataCentre           `json:"dataCentres"`
 }
 
 type DataCentre struct {
@@ -162,6 +164,7 @@ type ResizeClusterRequest struct {
 	NewNodeSize           string `json:"newNodeSize"`
 	ConcurrentResizes     int    `json:"concurrentResizes"`
 	NotifySupportContacts string `json:"notifySupportContacts"`
+	NodePurpose           string `json:"nodePurpose"`
 }
 
 type EncryptionKey struct {
@@ -192,7 +195,10 @@ type DeleteKafkaUserRequest struct {
 }
 
 type BundleConfig struct {
-	IsKafkaCluster    bool
-	HasRestProxy      bool
-	HasSchemaRegistry bool
+	IsKafkaCluster         bool
+	HasRestProxy           bool
+	HasSchemaRegistry      bool
+	IsElasticsearchCluster bool
+	HasDedicatedMaster     bool
+	HasKibana              bool
 }
